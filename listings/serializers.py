@@ -84,6 +84,7 @@ class ListingSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at'
         ]
         read_only_fields = ['price_per_sqm', 'created_at', 'updated_at']
+        depth = 1
 
 
 class ListingCreateSerializer(serializers.ModelSerializer):
