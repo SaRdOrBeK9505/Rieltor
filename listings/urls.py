@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     DistrictViewSet,
     ListingViewSet,
+    ListingImageViewSet,
     SearchByPhoneView,
     DashboardStatsView,
 )
@@ -10,6 +11,7 @@ from .views import (
 router = DefaultRouter()
 router.register(r'districts', DistrictViewSet, basename='district')
 router.register(r'listings', ListingViewSet, basename='listing')
+router.register(r'images', ListingImageViewSet, basename='image')
 
 urlpatterns = [
     path('', include(router.urls)),

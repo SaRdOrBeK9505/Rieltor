@@ -123,6 +123,41 @@ class ListingViewSet(viewsets.ModelViewSet):
             )
 
 
+class ListingImageViewSet(viewsets.ViewSet):
+    """
+    API endpoint for managing listing images globally.
+    Allows deleting images by ID without specifying listing.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(
+        operation_id='delete_image_by_id',
+        parameters=[
+            OpenApiParameter(
+                name='pk',
+                type=OpenApiTypes.INT,
+                location='path',
+                description='ID of the image to delete'
+            )
+        ],
+        responses={200: None, 404: None}
+    )
+    def destroy(self, request, pk=None):
+        """
+        Delete an image by ID.
+        Can delete any image regardless of which listing it belongs to.
+        """
+        try:
+            image = ListingImage.objects.get(id=pk)
+            image.delete()
+            return Response({'detail': 'Rasm muvaffaqiyatli o\'chirildi'})
+        except ListingImage.DoesNotExist:
+            return Response(
+                {'detail': 'Rasm topilmadi'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+
 class SearchByPhoneView(generics.GenericAPIView):
     """
     API endpoint for searching listings by property owner phone number.
