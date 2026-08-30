@@ -16,6 +16,12 @@ class PropertyOwner(models.Model):
     phone_number = models.CharField(max_length=20, db_index=True, unique=True)
     full_name = models.CharField(max_length=255, blank=True)
 
+    def save(self, *args, **kwargs):
+        # Normalize phone number: remove +, spaces, dashes
+        if self.phone_number:
+            self.phone_number = self.phone_number.replace('+', '').replace(' ', '').replace('-', '')
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.full_name or self.phone_number}"
 

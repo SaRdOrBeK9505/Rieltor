@@ -127,6 +127,7 @@ class SearchByPhoneView(generics.GenericAPIView):
     """
     API endpoint for searching listings by property owner phone number.
     Returns all listings associated with the given phone number.
+    Normalizes phone number format for better matching.
     """
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = ListingSerializer
@@ -137,7 +138,7 @@ class SearchByPhoneView(generics.GenericAPIView):
                 name='phone',
                 type=OpenApiTypes.STR,
                 location='query',
-                description='Phone number to search for'
+                description='Phone number to search for (e.g., +998543253453 or 998543253453)'
             )
         ]
     )
@@ -149,8 +150,12 @@ class SearchByPhoneView(generics.GenericAPIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
+        # Normalize phone number: remove +, spaces, dashes
+        normalized_phone = phone.replace('+', '').replace(' ', '').replace('-', '')
+        
+        # Search with both exact match and partial match
         owners = PropertyOwner.objects.filter(
-            phone_number__icontains=phone
+            phone_number__icontains=normalized_phone
         )
         
         listings = Listing.objects.filter(

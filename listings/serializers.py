@@ -90,6 +90,7 @@ class ListingCreateSerializer(serializers.ModelSerializer):
     """
     Serializer for creating new listings.
     Accepts owner_phone and automatically creates/retrieves PropertyOwner.
+    Returns the created listing with id.
     """
     owner_phone = serializers.CharField(
         write_only=True,
@@ -99,10 +100,11 @@ class ListingCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Listing
         fields = [
-            'property_type', 'deal_type', 'rooms_count', 'floor',
+            'id', 'property_type', 'deal_type', 'rooms_count', 'floor',
             'total_floors', 'total_area', 'district', 'price',
             'registered_at', 'owner_phone'
         ]
+        read_only_fields = ['id']
 
     def create(self, validated_data):
         owner_phone = validated_data.pop('owner_phone')
@@ -122,14 +124,16 @@ class ListingUpdateSerializer(serializers.ModelSerializer):
     """
     Serializer for updating existing listings.
     Allows modification of all listing fields.
+    Returns the updated listing with id.
     """
     class Meta:
         model = Listing
         fields = [
-            'property_type', 'deal_type', 'rooms_count', 'floor',
+            'id', 'property_type', 'deal_type', 'rooms_count', 'floor',
             'total_floors', 'total_area', 'district', 'price',
             'registered_at', 'owner'
         ]
+        read_only_fields = ['id']
 
 
 class ListingImageUploadSerializer(serializers.Serializer):
