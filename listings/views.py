@@ -150,16 +150,24 @@ class SearchByPhoneView(generics.GenericAPIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Normalize phone number: remove +, spaces, dashes
-        normalized_phone = phone.replace('+', '').replace(' ', '').replace('-', '')
+        # Normalize input phone number: remove +, spaces, dashes, parentheses
+        normalized_phone = phone.replace('+', '').replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
         
-        # Search with both exact match and partial match
-        owners = PropertyOwner.objects.filter(
-            phone_number__icontains=normalized_phone
-        )
+        # Get all owners and filter manually to handle different formats
+        all_owners = PropertyOwner.objects.all()
+        matching_owners = []
+        
+        for owner in all_owners:
+            # Normalize owner phone number
+            owner_phone_normalized = owner.phone_number.replace('+', '').replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
+            if normalized_phone in owner_phone_normalized or owner_phone_normalized in normalized_phone:
+                matching_owners.append(owner)
+        
+        if not matching_owners:
+            return Response([], status=status.HTTP_200_OK)
         
         listings = Listing.objects.filter(
-            owner__in=owners
+            owner__in=matching_owners
         ).select_related('district', 'owner')
         
         serializer = self.get_serializer(listings, many=True)
