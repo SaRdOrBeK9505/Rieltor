@@ -82,24 +82,26 @@ class TelegramBot:
         return value if value else "Ko'rsatilmagan"
 
     def build_listing_message(self, listing):
-        """Build the HTML-formatted card text for a listing, mirroring the target design."""
+        """Build a plain, minimal-icon HTML card text for a listing."""
         get_display = self._get_display
 
-        deal_status = "🔴 <b>SOTUVDA</b>" if listing.deal_type == 'sale' else "🟢 <b>IJARAGA</b>"
-        property_status = f"🏗️ <b>{listing.get_property_type_display().upper()}</b>"
+        deal_status = "SOTUVDA" if listing.deal_type == 'sale' else "IJARAGA"
+        property_status = listing.get_property_type_display().upper()
 
         lines = [
-            f"{deal_status}   •   {property_status}",
+            f"<b>{deal_status} • {property_status}</b>",
             "",
-            f"💰 <b>${listing.price:,.2f}</b>",
-            f"<code>${listing.price_per_sqm:,.2f}/m²</code>",
+            f"<b>${listing.price:,.2f}</b>",
+            f"${listing.price_per_sqm:,.2f}/m²",
             "",
-            f"📍 <b>Tuman:</b> {listing.district.name}",
-            f"🏠 <b>Manzil:</b> {get_display(listing.address)}",
-            f"📌 <b>Yaqinida:</b> {get_display(listing.nearby)}",
+            f"<b>Tuman:</b> {listing.district.name}",
+            f"<b>Manzil:</b> {get_display(listing.address)}",
+            f"<b>Yaqinida:</b> {get_display(listing.nearby)}",
             "",
-            f"🚪 <b>Xonalar:</b> {listing.rooms_count} xona    🏢 <b>Qavat:</b> {listing.floor}/{listing.total_floors}",
-            f"📐 <b>Maydon:</b> {listing.total_area} m²    🏗️ <b>Uy turi:</b> {listing.get_property_type_display()}",
+            f"<b>Xonalar:</b> {listing.rooms_count} xona",
+            f"<b>Qavat:</b> {listing.floor}/{listing.total_floors}",
+            f"<b>Maydon:</b> {listing.total_area} m²",
+            f"<b>Uy turi:</b> {listing.get_property_type_display()}",
         ]
 
         # amenities can hold multiple lines - first line shown as "Qo'shimcha",
@@ -107,17 +109,17 @@ class TelegramBot:
         amenity_lines = [line.strip() for line in (listing.amenities or "").splitlines() if line.strip()]
         lines.append("")
         if amenity_lines:
-            lines.append(f"✨ <b>Qo'shimcha:</b> {amenity_lines[0]}")
+            lines.append(f"<b>Qo'shimcha:</b> {amenity_lines[0]}")
             if len(amenity_lines) > 1:
-                lines.append(f"🛎️ <b>Sharoitlar:</b> {', '.join(amenity_lines[1:])}")
+                lines.append(f"<b>Sharoitlar:</b> {', '.join(amenity_lines[1:])}")
         else:
-            lines.append(f"✨ <b>Qo'shimcha:</b> {get_display(listing.amenities)}")
+            lines.append(f"<b>Qo'shimcha:</b> {get_display(listing.amenities)}")
 
         lines += [
             "",
-            f"📅 <b>Ro'yxatdan o'tgan:</b> {listing.registered_at.strftime('%Y-%m-%d')}",
+            f"<b>Ro'yxatdan o'tgan:</b> {listing.registered_at.strftime('%Y-%m-%d')}",
             "",
-            f"📞 <b>Telefon:</b> <code>+{listing.owner.phone_number}</code>",
+            f"<b>Telefon:</b> <code>+{listing.owner.phone_number}</code>",
         ]
 
         return "\n".join(lines)
@@ -125,6 +127,16 @@ class TelegramBot:
     async def send_listing_images(self, update: Update, listing, message: str):
         """Send listing photos as one grouped album (like a photo strip) with the card as caption."""
         images = [img for img in listing.images.all() if img.image]
+
+        # DEBUG: log the exact URLs being sent to Telegram so we can see whether
+        # they're absolute https:// Spaces URLs or broken relative paths.
+        # Remove this block once images are confirmed working.
+        logger.info(f"Listing {listing.id}: found {len(images)} image(s)")
+        for img in images:
+            try:
+                logger.info(f"  -> image url: {img.image.url}")
+            except Exception as e:
+                logger.error(f"  -> could not resolve url for image {img.id}: {e}")
 
         if not images:
             await update.message.reply_text(message, parse_mode='HTML')
