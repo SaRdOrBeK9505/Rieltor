@@ -102,6 +102,8 @@ class TelegramBot:
             f"<b>Qavat:</b> {listing.floor}/{listing.total_floors}",
             f"<b>Maydon:</b> {listing.total_area} m²",
             f"<b>Uy turi:</b> {listing.get_property_type_display()}",
+            "",
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         ]
 
         # amenities can hold multiple lines - first line shown as "Qo'shimcha",
@@ -202,17 +204,6 @@ class TelegramBot:
         # Photos are sent as a single album so Telegram renders them as a photo
         # strip/grid at the top of the card, matching the target design.
         await self.send_listing_images(update, listing, message)
-
-        # Contact button
-        keyboard = [
-            [InlineKeyboardButton("📞 Telefon raqamni nusxalash uchun bosing", callback_data=f"copy_phone_{listing.owner.phone_number}")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-        await update.message.reply_text(
-            "👇 Telefon raqamni nusxalash uchun tugmani bosing",
-            reply_markup=reply_markup
-        )
 
     async def handle_callback_query(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle callback queries (button clicks)"""
