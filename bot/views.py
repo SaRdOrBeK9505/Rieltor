@@ -26,9 +26,9 @@ class TelegramBot:
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /start command"""
         welcome_message = (
-            "🏠 *Ko'chmas mulk botiga xush kelibsiz!*\n\n"
+            "🏠 <b>Ko'chmas mulk botiga xush kelibsiz!</b>\n\n"
             "Kvartira ma'lumotlarini olish uchun kvartira ID sini kiriting.\n\n"
-            "📝 *Foydalanish:*\n"
+            "📝 <b>Foydalanish:</b>\n"
             "1. Kvartira ID sini yuboring (masalan: 18)\n"
             "2. Bot sizga to'liq ma'lumot va rasmlarni chiqaradi\n\n"
             "❓ Yordam uchun /help buyrug'ini bosing"
@@ -36,17 +36,17 @@ class TelegramBot:
         
         await update.message.reply_text(
             welcome_message,
-            parse_mode='Markdown'
+            parse_mode='HTML'
         )
 
     async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /help command"""
         help_message = (
-            "🆘 *Yordam*\n\n"
-            "📌 *Mavjud buyruqlar:*\n"
+            "🆘 <b>Yordam</b>\n\n"
+            "📌 <b>Mavjud buyruqlar:</b>\n"
             "/start - Botni boshlash\n"
             "/help - Yordam\n\n"
-            "📌 *Kvartira ma'lumotlari:*\n"
+            "📌 <b>Kvartira ma'lumotlari:</b>\n"
             "Kvartira ID sini yuboring va bot sizga quyidagilarni chiqaradi:\n"
             "• Tuman\n"
             "• Xonalar soni\n"
@@ -60,7 +60,7 @@ class TelegramBot:
         
         await update.message.reply_text(
             help_message,
-            parse_mode='Markdown'
+            parse_mode='HTML'
         )
 
     @sync_to_async
@@ -81,8 +81,8 @@ class TelegramBot:
             listing_id = int(update.message.text.strip())
         except ValueError:
             await update.message.reply_text(
-                "❌ *Xatolik!* Iltimos, faqat raqam kiriting (masalan: 18)",
-                parse_mode='Markdown'
+                "❌ <b>Xatolik!</b> Iltimos, faqat raqam kiriting (masalan: 18)",
+                parse_mode='HTML'
             )
             return
 
@@ -92,58 +92,69 @@ class TelegramBot:
 
         if not listing:
             await update.message.reply_text(
-                f"❌ *Kvartira topilmadi!* ID: {listing_id}\n\n"
+                f"❌ <b>Kvartira topilmadi!</b> ID: {listing_id}\n\n"
                 "Iltimos, to'g'ri ID ni kiriting.",
-                parse_mode='Markdown'
+                parse_mode='HTML'
             )
             return
 
-        # Format listing information
+        # Format listing information with modern HTML styling
         property_type_emoji = "🏢" if listing.property_type == 'novostroyka' else "🏠"
         deal_type_emoji = "💰" if listing.deal_type == 'sale' else "🔑"
+        owner_name = listing.owner.full_name if listing.owner.full_name else "Ko'rsatilmagan"
         
+        # Create modern card-style message
         message = (
-            f"{property_type_emoji} *{listing.get_property_type_display()}*\n\n"
-            f"📍 *Tuman:* {listing.district.name}\n"
-            f"🏠 *Xonalar:* {listing.rooms_count}\n"
-            f"🏢 *Qavat:* {listing.floor}/{listing.total_floors}\n"
-            f"📐 *Maydon:* {listing.total_area} m²\n"
-            f"{deal_type_emoji} *Tur:* {listing.get_deal_type_display()}\n"
-            f"💵 *Narx:* ${listing.price:,.2f}\n"
-            f"📊 *Narx m²:* ${listing.price_per_sqm:,.2f}\n"
-            f"📞 *Telefon:* {listing.owner.phone_number}\n"
-            f"👤 *Egasi:* {listing.owner.full_name or 'Ko\'rsatilmagan'}\n"
-            f"📅 *Ro'yxatdan o'tgan:* {listing.registered_at.strftime('%d.%m.%Y')}\n\n"
-            f"📸 *Rasmlar:* {listing.images.count()} ta"
+            f"<b>{property_type_emoji} {listing.get_property_type_display()}</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"📍 <b>Tuman:</b> {listing.district.name}\n"
+            f"🏠 <b>Xonalar:</b> {listing.rooms_count}\n"
+            f"🏢 <b>Qavat:</b> {listing.floor}/{listing.total_floors}\n"
+            f"📐 <b>Maydon:</b> {listing.total_area} m²\n"
+            f"{deal_type_emoji} <b>Tur:</b> {listing.get_deal_type_display()}\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"💵 <b>Narx:</b> <code>${listing.price:,.2f}</code>\n"
+            f"📊 <b>Narx m²:</b> <code>${listing.price_per_sqm:,.2f}</code>\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"📞 <b>Telefon:</b> <code>{listing.owner.phone_number}</code>\n"
+            f"👤 <b>Egasi:</b> {owner_name}\n"
+            f"📅 <b>Ro'yxatdan o'tgan:</b> {listing.registered_at.strftime('%d.%m.%Y')}\n"
+            f"📸 <b>Rasmlar:</b> {listing.images.count()} ta"
         )
 
-        # Send listing info
-        await update.message.reply_text(message, parse_mode='Markdown')
-
-        # Send images
+        # Send images with caption first
         images = listing.images.all()
         if images.exists():
-            await update.message.reply_text("📸 *Rasmlar:*", parse_mode='Markdown')
-            
-            # Send images in groups of up to 10
-            for i in range(0, len(images), 10):
-                image_group = images[i:i+10]
-                media_group = []
-                
-                for image in image_group:
-                    if image.image:
-                        media_group.append(image.image.url)
-                
-                # Send images one by one (Telegram media groups have limitations)
-                for image in image_group:
-                    if image.image:
-                        try:
-                            await update.message.reply_photo(photo=image.image.url)
-                        except Exception as e:
-                            logger.error(f"Error sending image: {e}")
-                            await update.message.reply_text(f"⚠️ Rasm yuborishda xatolik: {image.id}")
+            first_image = images.first()
+            if first_image and first_image.image:
+                try:
+                    await update.message.reply_photo(
+                        photo=first_image.image.url,
+                        caption=message,
+                        parse_mode='HTML'
+                    )
+                    
+                    # Send remaining images
+                    for image in images[1:]:
+                        if image.image:
+                            try:
+                                await update.message.reply_photo(photo=image.image.url)
+                            except Exception as e:
+                                logger.error(f"Error sending image: {e}")
+                except Exception as e:
+                    logger.error(f"Error sending first image: {e}")
+                    # Fallback to text message if image fails
+                    await update.message.reply_text(message, parse_mode='HTML')
+                    
+                    # Send all images separately
+                    for image in images:
+                        if image.image:
+                            try:
+                                await update.message.reply_photo(photo=image.image.url)
+                            except Exception as e:
+                                logger.error(f"Error sending image: {e}")
         else:
-            await update.message.reply_text("📭 *Rasmlar yo'q*", parse_mode='Markdown')
+            await update.message.reply_text(message, parse_mode='HTML')
 
         # Add contact button
         keyboard = [
@@ -163,7 +174,7 @@ class TelegramBot:
         
         if query.data.startswith('copy_phone_'):
             phone_number = query.data.replace('copy_phone_', '')
-            await query.message.reply_text(f"📞 *Telefon raqam:* `{phone_number}`", parse_mode='Markdown')
+            await query.message.reply_text(f"📞 <b>Telefon raqam:</b> <code>{phone_number}</code>", parse_mode='HTML')
 
     def run(self):
         """Run the bot"""
