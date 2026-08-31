@@ -24,6 +24,7 @@ Backend for real estate listing management with Django REST Framework.
 - DigitalOcean Spaces (django-storages) - optional
 - Django Jazzmin - Admin theme
 - drf-spectacular - API documentation
+- Python Telegram Bot - Telegram integration
 
 ## Setup Instructions
 
@@ -61,6 +62,9 @@ AWS_SECRET_ACCESS_KEY=
 AWS_STORAGE_BUCKET_NAME=
 AWS_S3_ENDPOINT_URL=https://nyc3.digitaloceanspaces.com
 AWS_S3_REGION_NAME=nyc3
+
+# Telegram Bot
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
 
 # REST Framework
 PAGE_SIZE=20
@@ -111,6 +115,14 @@ python manage.py createsuperuser
 ```bash
 python manage.py runserver
 ```
+
+### 6. Start Telegram Bot (Optional)
+
+```bash
+python manage.py start_bot
+```
+
+**Note**: Make sure to set `TELEGRAM_BOT_TOKEN` in your `.env` file before starting the bot.
 
 ## Admin Panel
 
@@ -258,3 +270,48 @@ The system includes 12 districts (excluding Bektemir):
 | Delete users | ✅ | ❌ |
 | Change own password | ✅ | ✅ |
 | View users list | ✅ | ❌ |
+
+## Telegram Bot
+
+The project includes a Telegram bot for easy access to listing information.
+
+### Bot Features:
+- **Start Command**: `/start` - Welcome message with instructions
+- **Help Command**: `/help` - Usage instructions
+- **Listing Search**: Send listing ID to get full information
+- **Rich Formatting**: Beautiful message layout with emojis
+- **Image Display**: All listing images sent in sequence
+- **Contact Button**: One-tap phone number copy
+
+### Bot Commands:
+- `/start` - Start bot and get welcome message
+- `/help` - Get help and usage instructions
+- Send listing ID (e.g., `18`) - Get listing details
+
+### Message Format:
+```
+🏢 Novostroyka
+
+📍 Tuman: Chilonzor
+🏠 Xonalar: 2
+🏢 Qavat: 23/34
+📐 Maydon: 11212.00 m²
+💰 Tur: Prodaja
+💵 Narx: $123,405.00
+📊 Narx m²: $11.01
+📞 Telefon: 998(97)6039505
+👤 Egasi: Ko'rsatilmagan
+📅 Ro'yxatdan o'tgan: 30.08.2026
+
+📸 Rasmlar: 15 ta
+```
+
+### Setup:
+1. Get Telegram bot token from [@BotFather](https://t.me/botfather)
+2. Add to `.env`: `TELEGRAM_BOT_TOKEN=your_token_here`
+3. Start bot: `python manage.py start_bot`
+
+### Error Handling:
+- Invalid ID: Shows error message
+- Listing not found: Shows not found message
+- Image errors: Shows warning for failed images

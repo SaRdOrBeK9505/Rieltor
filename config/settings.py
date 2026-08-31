@@ -39,14 +39,19 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    
+    # Third party apps
     'rest_framework',
     'rest_framework_simplejwt',
     'django_filters',
     'corsheaders',
-    'drf_spectacular',
     'jazzmin',
+    'drf_spectacular',
+    
+    # Local apps
     'accounts',
     'listings',
+    'bot',
 ]
 
 # Storage - conditional based on AWS credentials
@@ -279,3 +284,6 @@ JAZZMIN_SETTINGS = {
     # hide default django admin
     'hide_default': True,
 }
+
+# Telegram Bot
+TELEGRAM_BOT_TOKEN = config('TELEGRAM_BOT_TOKEN', default='')
