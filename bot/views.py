@@ -185,14 +185,14 @@ class TelegramBot:
             )
             return
 
-        await update.message.reply_text("🔍 Ma'lumotlar qidirilmoqda...")
 
         listing = await self.get_listing_by_id(listing_id)
 
         if not listing:
             await update.message.reply_text(
                 f"❌ <b>Kvartira topilmadi!</b> ID: {listing_id}\n\n"
-                "Iltimos, to'g'ri ID ni kiriting.",
+                "Iltimos, to'g'ri ID ni kiriting.\n\n"
+                "Agar sizda savollar bo'lsa, iltimos, admin bilan bog'laning.",
                 parse_mode='HTML'
             )
             return
@@ -205,7 +205,7 @@ class TelegramBot:
 
         # Contact button
         keyboard = [
-            [InlineKeyboardButton("📞 Telefon raqamni nusxalash", callback_data=f"copy_phone_{listing.owner.phone_number}")]
+            [InlineKeyboardButton("📞 Telefon raqamni nusxalash uchun bosing", callback_data=f"copy_phone_{listing.owner.phone_number}")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
