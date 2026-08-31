@@ -211,7 +211,8 @@ if USE_S3_STORAGE:
     AWS_STORAGE_BUCKET_NAME = config('AWS_STORAGE_BUCKET_NAME', default='')
     AWS_S3_ENDPOINT_URL = config('AWS_S3_ENDPOINT_URL', default='https://nyc3.digitaloceanspaces.com')
     AWS_S3_REGION_NAME = config('AWS_S3_REGION_NAME', default='nyc3')
-    AWS_DEFAULT_ACL = None
+    AWS_DEFAULT_ACL = 'public-read'
+    AWS_QUERYSTRING_AUTH = False
     AWS_S3_OBJECT_PARAMETERS = {
         'CacheControl': 'max-age=86400',
     }
@@ -232,6 +233,16 @@ CORS_ALLOWED_ORIGINS = config(
     cast=lambda v: [s.strip() for s in v.split(',')]
 )
 CORS_ALLOW_CREDENTIALS = config('CORS_ALLOW_CREDENTIALS', default=True, cast=bool)
+
+# HTTPS xavfsizlik sozlamalari
+SECURE_SSL_REDIRECT = not DEBUG
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+CSRF_TRUSTED_ORIGINS = config(
+    'CSRF_TRUSTED_ORIGINS',
+    default='',
+    cast=lambda v: [s.strip() for s in v.split(',') if s.strip()]
+)
 
 # Jazzmin Admin Theme
 JAZZMIN_SETTINGS = {
