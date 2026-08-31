@@ -103,23 +103,33 @@ class TelegramBot:
         deal_type_emoji = "💰" if listing.deal_type == 'sale' else "🔑"
         owner_name = listing.owner.full_name if listing.owner.full_name else "Ko'rsatilmagan"
         
-        # Create modern card-style message
+        # Status badges - matching design colors
+        deal_status = "🔴 SOTUVDA" if listing.deal_type == 'sale' else "🟢 IJARAGA"
+        property_status = f"� {listing.get_property_type_display().upper()}"
+        
+        # Helper for default values
+        def get_display(value):
+            return value if value else "Ko'rsatilmagan"
+        
+        # Create modern card-style message based on design
         message = (
-            f"<b>{property_type_emoji} {listing.get_property_type_display()}</b>\n"
+            f"{deal_status} • {property_status}\n\n"
+            f"💵 <b>${listing.price:,.2f}</b>\n"
+            f"<code>${listing.price_per_sqm:,.2f}/m²</code>\n\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
             f"📍 <b>Tuman:</b> {listing.district.name}\n"
-            f"🏠 <b>Xonalar:</b> {listing.rooms_count}\n"
-            f"🏢 <b>Qavat:</b> {listing.floor}/{listing.total_floors}\n"
+            f"🏠 <b>Manzil:</b> {get_display(listing.address)}\n"
+            f"🏛️ <b>Yaqinida:</b> {get_display(listing.nearby)}\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"🏠 <b>Xonalar:</b> {listing.rooms_count} xona\n"
+            f"🏢 <b>Qavat:</b> {listing.floor}/{listing.total_floors}-qavat\n"
             f"📐 <b>Maydon:</b> {listing.total_area} m²\n"
-            f"{deal_type_emoji} <b>Tur:</b> {listing.get_deal_type_display()}\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"💵 <b>Narx:</b> <code>${listing.price:,.2f}</code>\n"
-            f"📊 <b>Narx m²:</b> <code>${listing.price_per_sqm:,.2f}</code>\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"📞 <b>Telefon:</b> <code>{listing.owner.phone_number}</code>\n"
-            f"👤 <b>Egasi:</b> {owner_name}\n"
-            f"📅 <b>Ro'yxatdan o'tgan:</b> {listing.registered_at.strftime('%d.%m.%Y')}\n"
-            f"📸 <b>Rasmlar:</b> {listing.images.count()} ta"
+            f"🏗️ <b>Uy turi:</b> {listing.get_property_type_display()}\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"✨ <b>Qo'shimcha:</b> {get_display(listing.amenities)}\n\n"
+            f"📅 <b>Ro'yxatdan o'tgan:</b> {listing.registered_at.strftime('%Y-%m-%d')}\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"📞 <b>Telefon:</b> <code>+{listing.owner.phone_number}</code>"
         )
 
         # Send images with caption first

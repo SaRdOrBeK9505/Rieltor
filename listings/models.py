@@ -62,6 +62,10 @@ class Listing(models.Model):
         related_name='listings'
     )
 
+    address = models.TextField(blank=True, help_text="To'liq manzil")
+    nearby = models.TextField(blank=True, help_text="Yaqinidagi obyektlar")
+    amenities = models.TextField(blank=True, help_text="Qo'shimcha sharoitlar (lift, internet, etc.)")
+
     price = models.DecimalField(max_digits=14, decimal_places=2)
     price_per_sqm = models.DecimalField(max_digits=12, decimal_places=2, editable=False)
 
