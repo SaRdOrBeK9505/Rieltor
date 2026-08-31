@@ -1,8 +1,8 @@
 import os
 import logging
 from asgiref.sync import sync_to_async
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 from django.conf import settings
 from listings.models import Listing, ListingImage
 
@@ -15,12 +15,14 @@ class TelegramBot:
         if not self.token:
             logger.error("TELEGRAM_BOT_TOKEN not found in settings")
             return
-        
+
         self.application = Application.builder().token(self.token).build()
         self.setup_handlers()
 
     def setup_handlers(self):
         self.application.add_handler(CommandHandler("start", self.start_command))
+        self.application.add_handler(CommandHandler("help", self.help_command))
+        self.application.add_handler(CallbackQueryHandler(self.handle_callback_query))
         self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_listing_id))
 
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -33,7 +35,7 @@ class TelegramBot:
             "2. Bot sizga to'liq ma'lumot va rasmlarni chiqaradi\n\n"
             "❓ Yordam uchun /help buyrug'ini bosing"
         )
-        
+
         await update.message.reply_text(
             welcome_message,
             parse_mode='HTML'
@@ -57,7 +59,7 @@ class TelegramBot:
             "• Rasmlar\n\n"
             "❓ Savollar uchun admin bilan bog'laning"
         )
-        
+
         await update.message.reply_text(
             help_message,
             parse_mode='HTML'
@@ -74,6 +76,91 @@ class TelegramBot:
         except Exception as e:
             logger.error(f"Error fetching listing: {e}")
             return None
+
+    @staticmethod
+    def _get_display(value):
+        return value if value else "Ko'rsatilmagan"
+
+    def build_listing_message(self, listing):
+        """Build the HTML-formatted card text for a listing, mirroring the target design."""
+        get_display = self._get_display
+
+        deal_status = "🔴 <b>SOTUVDA</b>" if listing.deal_type == 'sale' else "🟢 <b>IJARAGA</b>"
+        property_status = f"🏗️ <b>{listing.get_property_type_display().upper()}</b>"
+
+        lines = [
+            f"{deal_status}   •   {property_status}",
+            "",
+            f"💰 <b>${listing.price:,.2f}</b>",
+            f"<code>${listing.price_per_sqm:,.2f}/m²</code>",
+            "",
+            f"📍 <b>Tuman:</b> {listing.district.name}",
+            f"🏠 <b>Manzil:</b> {get_display(listing.address)}",
+            f"📌 <b>Yaqinida:</b> {get_display(listing.nearby)}",
+            "",
+            f"🚪 <b>Xonalar:</b> {listing.rooms_count} xona    🏢 <b>Qavat:</b> {listing.floor}/{listing.total_floors}",
+            f"📐 <b>Maydon:</b> {listing.total_area} m²    🏗️ <b>Uy turi:</b> {listing.get_property_type_display()}",
+        ]
+
+        # amenities can hold multiple lines - first line shown as "Qo'shimcha",
+        # any remaining lines shown as "Sharoitlar" (matches the two-field target layout)
+        amenity_lines = [line.strip() for line in (listing.amenities or "").splitlines() if line.strip()]
+        lines.append("")
+        if amenity_lines:
+            lines.append(f"✨ <b>Qo'shimcha:</b> {amenity_lines[0]}")
+            if len(amenity_lines) > 1:
+                lines.append(f"🛎️ <b>Sharoitlar:</b> {', '.join(amenity_lines[1:])}")
+        else:
+            lines.append(f"✨ <b>Qo'shimcha:</b> {get_display(listing.amenities)}")
+
+        lines += [
+            "",
+            f"📅 <b>Ro'yxatdan o'tgan:</b> {listing.registered_at.strftime('%Y-%m-%d')}",
+            "",
+            f"📞 <b>Telefon:</b> <code>+{listing.owner.phone_number}</code>",
+        ]
+
+        return "\n".join(lines)
+
+    async def send_listing_images(self, update: Update, listing, message: str):
+        """Send listing photos as one grouped album (like a photo strip) with the card as caption."""
+        images = [img for img in listing.images.all() if img.image]
+
+        if not images:
+            await update.message.reply_text(message, parse_mode='HTML')
+            return
+
+        if len(images) == 1:
+            try:
+                await update.message.reply_photo(
+                    photo=images[0].image.url,
+                    caption=message,
+                    parse_mode='HTML'
+                )
+            except Exception as e:
+                logger.error(f"Error sending image: {e}")
+                await update.message.reply_text(message, parse_mode='HTML')
+            return
+
+        # Telegram albums support at most 10 items
+        media = []
+        for idx, image in enumerate(images[:10]):
+            if idx == 0:
+                media.append(InputMediaPhoto(media=image.image.url, caption=message, parse_mode='HTML'))
+            else:
+                media.append(InputMediaPhoto(media=image.image.url))
+
+        try:
+            await update.message.reply_media_group(media=media)
+        except Exception as e:
+            logger.error(f"Error sending media group: {e}")
+            # Fallback: text message + images one by one
+            await update.message.reply_text(message, parse_mode='HTML')
+            for image in images:
+                try:
+                    await update.message.reply_photo(photo=image.image.url)
+                except Exception as e2:
+                    logger.error(f"Error sending image: {e2}")
 
     async def handle_listing_id(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle listing ID input"""
@@ -98,82 +185,20 @@ class TelegramBot:
             )
             return
 
-        # Format listing information with modern HTML styling
-        property_type_emoji = "🏢" if listing.property_type == 'novostroyka' else "🏠"
-        deal_type_emoji = "💰" if listing.deal_type == 'sale' else "🔑"
-        owner_name = listing.owner.full_name if listing.owner.full_name else "Ko'rsatilmagan"
-        
-        # Status badges - matching design colors
-        deal_status = "🔴 SOTUVDA" if listing.deal_type == 'sale' else "🟢 IJARAGA"
-        property_status = f"� {listing.get_property_type_display().upper()}"
-        
-        # Helper for default values
-        def get_display(value):
-            return value if value else "Ko'rsatilmagan"
-        
-        # Create modern card-style message based on design
-        message = (
-            f"{deal_status} • {property_status}\n\n"
-            f"💵 <b>${listing.price:,.2f}</b>\n"
-            f"<code>${listing.price_per_sqm:,.2f}/m²</code>\n\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            f"📍 <b>Tuman:</b> {listing.district.name}\n"
-            f"🏠 <b>Manzil:</b> {get_display(listing.address)}\n"
-            f"🏛️ <b>Yaqinida:</b> {get_display(listing.nearby)}\n\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            f"🏠 <b>Xonalar:</b> {listing.rooms_count} xona\n"
-            f"🏢 <b>Qavat:</b> {listing.floor}/{listing.total_floors}-qavat\n"
-            f"📐 <b>Maydon:</b> {listing.total_area} m²\n"
-            f"🏗️ <b>Uy turi:</b> {listing.get_property_type_display()}\n\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            f"✨ <b>Qo'shimcha:</b> {get_display(listing.amenities)}\n\n"
-            f"📅 <b>Ro'yxatdan o'tgan:</b> {listing.registered_at.strftime('%Y-%m-%d')}\n\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            f"📞 <b>Telefon:</b> <code>+{listing.owner.phone_number}</code>"
-        )
+        message = self.build_listing_message(listing)
 
-        # Send images with caption first
-        images = listing.images.all()
-        if images.exists():
-            first_image = images.first()
-            if first_image and first_image.image:
-                try:
-                    await update.message.reply_photo(
-                        photo=first_image.image.url,
-                        caption=message,
-                        parse_mode='HTML'
-                    )
-                    
-                    # Send remaining images
-                    for image in images[1:]:
-                        if image.image:
-                            try:
-                                await update.message.reply_photo(photo=image.image.url)
-                            except Exception as e:
-                                logger.error(f"Error sending image: {e}")
-                except Exception as e:
-                    logger.error(f"Error sending first image: {e}")
-                    # Fallback to text message if image fails
-                    await update.message.reply_text(message, parse_mode='HTML')
-                    
-                    # Send all images separately
-                    for image in images:
-                        if image.image:
-                            try:
-                                await update.message.reply_photo(photo=image.image.url)
-                            except Exception as e:
-                                logger.error(f"Error sending image: {e}")
-        else:
-            await update.message.reply_text(message, parse_mode='HTML')
+        # Photos are sent as a single album so Telegram renders them as a photo
+        # strip/grid at the top of the card, matching the target design.
+        await self.send_listing_images(update, listing, message)
 
-        # Add contact button
+        # Contact button
         keyboard = [
             [InlineKeyboardButton("📞 Telefon raqamni nusxalash", callback_data=f"copy_phone_{listing.owner.phone_number}")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        
+
         await update.message.reply_text(
-            "📞 Telefon raqamni nusxalash uchun tugmani bosing",
+            "👇 Telefon raqamni nusxalash uchun tugmani bosing",
             reply_markup=reply_markup
         )
 
@@ -181,7 +206,7 @@ class TelegramBot:
         """Handle callback queries (button clicks)"""
         query = update.callback_query
         await query.answer()
-        
+
         if query.data.startswith('copy_phone_'):
             phone_number = query.data.replace('copy_phone_', '')
             await query.message.reply_text(f"📞 <b>Telefon raqam:</b> <code>{phone_number}</code>", parse_mode='HTML')
@@ -191,12 +216,6 @@ class TelegramBot:
         if not self.token:
             logger.error("Cannot run bot: TELEGRAM_BOT_TOKEN not set")
             return
-
-        self.application.add_handler(CommandHandler("help", self.help_command))
-        
-        # Add callback query handler
-        from telegram.ext import CallbackQueryHandler
-        self.application.add_handler(CallbackQueryHandler(self.handle_callback_query))
 
         logger.info("Starting Telegram bot...")
         self.application.run_polling(allowed_updates=Update.ALL_TYPES)
