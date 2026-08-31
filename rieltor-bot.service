@@ -1,0 +1,16 @@
+[Unit]
+Description=Rieltor Telegram Bot
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=tasanno
+Group=tasanno
+WorkingDirectory=/home/tasanno/Rieltor
+Environment="PATH=/home/tasanno/Rieltor/venv/bin"
+ExecStart=/home/tasanno/Rieltor/venv/bin/python manage.py start_bot
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

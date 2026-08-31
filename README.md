@@ -311,6 +311,52 @@ The project includes a Telegram bot for easy access to listing information.
 2. Add to `.env`: `TELEGRAM_BOT_TOKEN=your_token_here`
 3. Start bot: `python manage.py start_bot`
 
+### Production Deployment (Systemd Service):
+
+For production, use systemd to keep the bot running automatically:
+
+1. **Create service file:**
+   ```bash
+   sudo nano /etc/systemd/system/rieltor-bot.service
+   ```
+
+2. **Paste the configuration:**
+   ```ini
+   [Unit]
+   Description=Rieltor Telegram Bot
+   After=network.target postgresql.service
+
+   [Service]
+   Type=simple
+   User=your_username
+   Group=your_username
+   WorkingDirectory=/path/to/Rieltor
+   Environment="PATH=/path/to/Rieltor/venv/bin"
+   ExecStart=/path/to/Rieltor/venv/bin/python manage.py start_bot
+   Restart=always
+   RestartSec=10
+
+   [Install]
+   WantedBy=multi-user.target
+   ```
+
+3. **Enable and start service:**
+   ```bash
+   sudo systemctl daemon-reload
+   sudo systemctl enable rieltor-bot
+   sudo systemctl start rieltor-bot
+   ```
+
+4. **Check status:**
+   ```bash
+   sudo systemctl status rieltor-bot
+   ```
+
+5. **View logs:**
+   ```bash
+   sudo journalctl -u rieltor-bot -f
+   ```
+
 ### Error Handling:
 - Invalid ID: Shows error message
 - Listing not found: Shows not found message
