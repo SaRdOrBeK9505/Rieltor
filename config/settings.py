@@ -46,7 +46,6 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'django_filters',
     'corsheaders',
-    'jazzmin',
     'drf_spectacular',
     
     # Local apps
