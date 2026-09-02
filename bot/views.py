@@ -1,4 +1,5 @@
 import os
+import io
 import logging
 from asgiref.sync import sync_to_async
 from telegram import Update, InputMediaPhoto
@@ -8,8 +9,6 @@ from listings.models import Listing, ListingImage
 
 logger = logging.getLogger('telegram_bot')
 
-
-import io
 
 class TelegramBot:
     def __init__(self):
@@ -139,10 +138,27 @@ class TelegramBot:
 
         return "\n".join(lines)
 
+    def build_continuation_caption(self, listing, batch_start, batch_end):
+        """
+        10 tadan ortiq rasm bo'lganda, 2-va keyingi guruhlar uchun
+        qisqa, foydali izoh (rasmlar "quruq" turmasligi uchun)
+        """
+        phone = listing.owner.phone_number if listing.owner else "Ko'rsatilmagan"
+        lines = [
+            f"<b>🆔 ID {listing.id} — rasmlar davomi ({batch_start}-{batch_end})</b>",
+            "",
+            f"<b>💰 ${listing.price:,.0f}</b>",
+            f"<b>📍 Rajon:</b> {listing.district.name}",
+            f"<b>📞 Telefon:</b> <code>+{phone}</code>",
+        ]
+        return "\n".join(lines)
+
     async def send_listing_with_images_and_info(self, update: Update, listing):
         """
-        Send listing IMAGES + TEXT as ONE MESSAGE
-        Images in batches (max 10 per batch), caption attached to first image
+        Send listing IMAGES + TEXT as ONE MESSAGE (birinchi 10 tasi uchun)
+        Agar rasmlar 10 tadan ko'p bo'lsa, Telegram cheklovi (sendMediaGroup
+        bitta chaqiruvda maksimum 10 ta media qabul qiladi) sababli qolgan
+        rasmlar keyingi habar(lar)da, lekin qisqa izoh bilan birga jo'natiladi.
         """
         images = [img for img in listing.images.all() if img.image]
         text = self.build_listing_message(listing)
@@ -162,10 +178,23 @@ class TelegramBot:
 
             for idx, img in enumerate(batch):
                 file_bytes = await self._read_image_bytes(img)
+
                 if batch_start == 0 and idx == 0:
+                    # Birinchi guruh, birinchi rasm -> to'liq karta
                     media.append(InputMediaPhoto(
                         media=file_bytes,
                         caption=text,
+                        parse_mode='HTML'
+                    ))
+                elif idx == 0:
+                    # Ikkinchi va keyingi guruhlarning birinchi rasmi ->
+                    # qisqa, foydali izoh (bo'sh/quruq qolmasligi uchun)
+                    continuation_caption = self.build_continuation_caption(
+                        listing, batch_start + 1, batch_start + len(batch)
+                    )
+                    media.append(InputMediaPhoto(
+                        media=file_bytes,
+                        caption=continuation_caption,
                         parse_mode='HTML'
                     ))
                 else:
@@ -173,11 +202,21 @@ class TelegramBot:
 
             try:
                 await update.message.reply_media_group(media=media)
+                logger.info(
+                    f"Listing {listing.id}: media group muvaffaqiyatli jo'natildi "
+                    f"({batch_start + 1}-{batch_start + len(batch)})"
+                )
             except Exception as e:
-                logger.error(f"Error sending media group: {e}")
+                logger.exception(f"Error sending media group: {e}")
                 # Fallback: text + rasmlar alohida
                 if batch_start == 0:
                     await update.message.reply_text(text, parse_mode='HTML')
+                else:
+                    continuation_caption = self.build_continuation_caption(
+                        listing, batch_start + 1, batch_start + len(batch)
+                    )
+                    await update.message.reply_text(continuation_caption, parse_mode='HTML')
+
                 for img in batch:
                     try:
                         file_bytes = await self._read_image_bytes(img)
