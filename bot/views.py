@@ -97,77 +97,79 @@ class TelegramBot:
     def _get_operator_info(self, listing):
         """
         Получить информацию оператора/администратора
+        (всегда идёт последней строкой в карточке — рис. образец)
         """
         if not listing.created_by:
-            return "Не указано"
+            return "👤 <b>Добавил:</b> Не указано"
 
         user = listing.created_by
 
+        if user.first_name and user.last_name:
+            full_name = f"{user.first_name} {user.last_name}"
+        elif user.first_name:
+            full_name = user.first_name
+        else:
+            full_name = user.username
+
         # Если это администратор (проверить по role полю)
         if hasattr(user, 'role') and user.role == 'admin':
-            # Если есть first_name и last_name
-            if user.first_name and user.last_name:
-                full_name = f"{user.first_name} {user.last_name}"
-            elif user.first_name:
-                full_name = user.first_name
-            else:
-                full_name = user.username
-            return f"<b>👨‍💼 АДМИНИСТРАТОР:</b> {full_name}"
+            return f"👨‍💼 <b>АДМИНИСТРАТОР:</b> {full_name}"
         else:
-            # Обычный оператор
-            if user.first_name and user.last_name:
-                full_name = f"{user.first_name} {user.last_name}"
-            elif user.first_name:
-                full_name = user.first_name
-            else:
-                full_name = user.username
-            return f"<b>👤 Оператор:</b> {full_name}"
+            return f"👤 <b>Оператор:</b> {full_name}"
 
     def build_listing_message(self, listing):
-        """Build a detailed HTML card text for a listing"""
+        """
+        Собрать текст карточки объявления в стиле образца:
+        🔥🔥 Продаётся срочно 🔥🔥
+        🏠 ТИП
+        📌 Район / Адрес / Ориентир
+        ✅ Комнат / Этаж / Этажность / Площадь
+        💰 Цена
+        📞 Моб
+        и в самом конце — кто добавил (оператор/админ)
+        """
         get_display = self._get_display
 
-        deal_status = "НА ПРОДАЖУ" if listing.deal_type == 'sale' else "В АРЕНДУ"
+        deal_status = "Продаётся срочно" if listing.deal_type == 'sale' else "Сдаётся срочно"
         property_status = listing.get_property_type_display().upper()
 
         lines = [
-            f"<b>🆔 ID {listing.id}</b>",
+            f"🔥🔥{deal_status}🔥🔥",
             "",
-            f"<b>{deal_status} • {property_status}</b>",
+            f"🏠 ТИП- {property_status}",
             "",
-            f"<b>💰 ${listing.price:,.0f}</b>",
-            f"<b>💵 ${listing.price_per_sqm:,.2f}/м²</b>",
+            f"📌 Район: {listing.district.name}",
+            f"📌 Адрес: {get_display(listing.address)}",
+            f"📌 Ориентир: {get_display(listing.nearby)}",
             "",
-            f"<b>📍 Район:</b> {listing.district.name}",
-            f"<b>📌 Адрес:</b> {get_display(listing.address)}",
-            f"<b>🚇 Рядом:</b> {get_display(listing.nearby)}",
-            "",
-            f"<b>🏠 Комнаты:</b> {listing.rooms_count}",
-            f"<b>🏢 Этаж:</b> {listing.floor}/{listing.total_floors}",
-            f"<b>📐 Площадь:</b> {listing.total_area} м²",
-            f"<b>🏗️ Тип:</b> {property_status}",
-            "",
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            f"✅ Комнат- {listing.rooms_count}",
+            f"✅ Этаж - {listing.floor}",
+            f"✅ Этажность- {listing.total_floors}",
+            f"✅ Площадь: {listing.total_area} м²",
         ]
 
-        # Amenities
+        # Amenities (agar bo'lsa, ✅ uslubida qo'shiladi)
         amenity_lines = [line.strip() for line in (listing.amenities or "").splitlines() if line.strip()]
         if amenity_lines:
             lines.append("")
-            lines.append(f"<b>✨ Особенности:</b> {amenity_lines[0]}")
+            lines.append(f"✅ Особенности: {amenity_lines[0]}")
             if len(amenity_lines) > 1:
-                lines.append(f"<b>🎯 Условия:</b> {', '.join(amenity_lines[1:])}")
-        else:
-            lines.append("")
-            lines.append(f"<b>✨ Особенности:</b> {get_display(listing.amenities)}")
+                lines.append(f"✅ Условия: {', '.join(amenity_lines[1:])}")
 
         lines += [
             "",
-            f"<b>📅 Добавлено:</b> {listing.created_at.strftime('%d.%m.%Y')}",
+            f"💰 Цена: {listing.price:,.0f}$",
+        ]
+
+        if listing.price_per_sqm:
+            lines.append(f"💵 {listing.price_per_sqm:,.2f}$/м²")
+
+        phone = listing.owner.phone_number if listing.owner else "Не указано"
+        lines += [
             "",
-            f"<b>📞 Контакт:</b> <code>+{listing.owner.phone_number if listing.owner else 'Не указано'}</code>",
+            f"📞 Моб : <code>+{phone}</code>",
             "",
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            f"📅 Добавлено: {listing.created_at.strftime('%d.%m.%Y')}",
             "",
             self._get_operator_info(listing),
         ]
@@ -176,17 +178,18 @@ class TelegramBot:
 
     def build_continuation_caption(self, listing, batch_start, batch_end):
         """
-        Краткий заголовок для следующих групп фото (2+)
+        Краткий заголовок для следующих групп фото (2+),
+        тот же набор иконок, в конце — оператор/админ
         """
         phone = listing.owner.phone_number if listing.owner else "Не указано"
         operator_info = self._get_operator_info(listing)
 
         lines = [
-            f"<b>🆔 ID {listing.id} — фото ({batch_start}-{batch_end})</b>",
+            f"🆔 ID {listing.id} — фото ({batch_start}-{batch_end})",
             "",
-            f"<b>💰 ${listing.price:,.0f}</b>",
-            f"<b>📍 Район:</b> {listing.district.name}",
-            f"<b>📞 Контакт:</b> <code>+{phone}</code>",
+            f"💰 Цена: {listing.price:,.0f}$",
+            f"📌 Район: {listing.district.name}",
+            f"📞 Моб : <code>+{phone}</code>",
             "",
             operator_info,
         ]
