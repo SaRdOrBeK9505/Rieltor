@@ -29,12 +29,12 @@ class TelegramBot:
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /start command"""
         welcome_message = (
-            "🏠 <b>Ko'chmas mulk botiga xush kelibsiz!</b>\n\n"
-            "Kvartira ma'lumotlarini olish uchun kvartira ID sini kiriting.\n\n"
-            "📝 <b>Foydalanish:</b>\n"
-            "1. Kvartira ID sini yuboring (masalan: 34858)\n"
-            "2. Bot sizga to'liq ma'lumot va rasmlarni chiqaradi\n\n"
-            "❓ Yordam uchun /help buyrug'ini bosing"
+            "🏠 <b>Добро пожаловать в бот недвижимости!</b>\n\n"
+            "Введите ID объявления, чтобы получить подробную информацию.\n\n"
+            "📝 <b>Как использовать:</b>\n"
+            "1. Отправьте ID объявления (например: 34858)\n"
+            "2. Бот покажет полную информацию и фото\n\n"
+            "❓ Нажмите /help для справки"
         )
 
         await update.message.reply_text(
@@ -45,20 +45,21 @@ class TelegramBot:
     async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /help command"""
         help_message = (
-            "🆘 <b>Yordam</b>\n\n"
-            "📌 <b>Mavjud buyruqlar:</b>\n"
-            "/start - Botni boshlash\n"
-            "/help - Yordam\n\n"
-            "📌 <b>Kvartira ma'lumotlari:</b>\n"
-            "Kvartira ID sini yuboring va bot sizga quyidagilarni chiqaradi:\n"
-            "• Rasmlar (grid-da)\n"
-            "• Tuman\n"
-            "• Xonalar soni\n"
-            "• Qavat\n"
-            "• Umumiy maydon\n"
-            "• Narx\n"
-            "• Telefon raqam\n\n"
-            "❓ Savollar uchun admin bilan bog'laning"
+            "🆘 <b>Справка</b>\n\n"
+            "📌 <b>Доступные команды:</b>\n"
+            "/start - Начать\n"
+            "/help - Справка\n\n"
+            "📌 <b>Информация об объекте:</b>\n"
+            "Отправьте ID объявления и получите:\n"
+            "• Фотографии (сетка)\n"
+            "• Район\n"
+            "• Количество комнат\n"
+            "• Этаж\n"
+            "• Площадь\n"
+            "• Цена\n"
+            "• Номер телефона\n"
+            "• Кто добавил объект\n\n"
+            "❓ Вопросы? Свяжитесь с администратором"
         )
 
         await update.message.reply_text(
@@ -70,7 +71,9 @@ class TelegramBot:
     def get_listing_by_id(self, listing_id):
         """Get listing by ID from database"""
         try:
-            listing = Listing.objects.select_related('district', 'owner').prefetch_related('images').get(id=listing_id)
+            listing = Listing.objects.select_related(
+                'district', 'owner', 'created_by'
+            ).prefetch_related('images').get(id=listing_id)
             return listing
         except Listing.DoesNotExist:
             return None
@@ -80,7 +83,7 @@ class TelegramBot:
 
     @sync_to_async
     def _read_image_bytes(self, img):
-        """Spaces'dan (boto3 orqali, CDN'ni chetlab o'tib) faylni o'qish"""
+        """Читать файл из Spaces (boto3)"""
         with img.image.open('rb') as f:
             data = f.read()
         bio = io.BytesIO(data)
@@ -89,13 +92,42 @@ class TelegramBot:
 
     @staticmethod
     def _get_display(value):
-        return value if value else "Ko'rsatilmagan"
+        return value if value else "Не указано"
+
+    def _get_operator_info(self, listing):
+        """
+        Получить информацию оператора/администратора
+        """
+        if not listing.created_by:
+            return "Не указано"
+
+        user = listing.created_by
+
+        # Если это администратор (проверить по role полю)
+        if hasattr(user, 'role') and user.role == 'admin':
+            # Если есть first_name и last_name
+            if user.first_name and user.last_name:
+                full_name = f"{user.first_name} {user.last_name}"
+            elif user.first_name:
+                full_name = user.first_name
+            else:
+                full_name = user.username
+            return f"<b>👨‍💼 АДМИНИСТРАТОР:</b> {full_name}"
+        else:
+            # Обычный оператор
+            if user.first_name and user.last_name:
+                full_name = f"{user.first_name} {user.last_name}"
+            elif user.first_name:
+                full_name = user.first_name
+            else:
+                full_name = user.username
+            return f"<b>👤 Оператор:</b> {full_name}"
 
     def build_listing_message(self, listing):
         """Build a detailed HTML card text for a listing"""
         get_display = self._get_display
 
-        deal_status = "SOTUVDA" if listing.deal_type == 'sale' else "IJARAGA"
+        deal_status = "НА ПРОДАЖУ" if listing.deal_type == 'sale' else "В АРЕНДУ"
         property_status = listing.get_property_type_display().upper()
 
         lines = [
@@ -104,16 +136,16 @@ class TelegramBot:
             f"<b>{deal_status} • {property_status}</b>",
             "",
             f"<b>💰 ${listing.price:,.0f}</b>",
-            f"<b>💵 ${listing.price_per_sqm:,.2f}/m²</b>",
+            f"<b>💵 ${listing.price_per_sqm:,.2f}/м²</b>",
             "",
-            f"<b>📍 Rajon:</b> {listing.district.name}",
-            f"<b>📌 Manzil:</b> {get_display(listing.address)}",
-            f"<b>🚇 Yaqinida:</b> {get_display(listing.nearby)}",
+            f"<b>📍 Район:</b> {listing.district.name}",
+            f"<b>📌 Адрес:</b> {get_display(listing.address)}",
+            f"<b>🚇 Рядом:</b> {get_display(listing.nearby)}",
             "",
-            f"<b>🏠 Xonalar:</b> {listing.rooms_count} xona",
-            f"<b>🏢 Qavat:</b> {listing.floor}/{listing.total_floors}",
-            f"<b>📐 Maydon:</b> {listing.total_area} m²",
-            f"<b>🏗️ Tur:</b> {property_status}",
+            f"<b>🏠 Комнаты:</b> {listing.rooms_count}",
+            f"<b>🏢 Этаж:</b> {listing.floor}/{listing.total_floors}",
+            f"<b>📐 Площадь:</b> {listing.total_area} м²",
+            f"<b>🏗️ Тип:</b> {property_status}",
             "",
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
         ]
@@ -122,56 +154,59 @@ class TelegramBot:
         amenity_lines = [line.strip() for line in (listing.amenities or "").splitlines() if line.strip()]
         if amenity_lines:
             lines.append("")
-            lines.append(f"<b>✨ Qo'shimcha:</b> {amenity_lines[0]}")
+            lines.append(f"<b>✨ Особенности:</b> {amenity_lines[0]}")
             if len(amenity_lines) > 1:
-                lines.append(f"<b>🎯 Sharoitlar:</b> {', '.join(amenity_lines[1:])}")
+                lines.append(f"<b>🎯 Условия:</b> {', '.join(amenity_lines[1:])}")
         else:
             lines.append("")
-            lines.append(f"<b>✨ Qo'shimcha:</b> {get_display(listing.amenities)}")
+            lines.append(f"<b>✨ Особенности:</b> {get_display(listing.amenities)}")
 
         lines += [
             "",
-            f"<b>📅 Ro'yxatdan o'tgan:</b> {listing.registered_at.strftime('%d.%m.%Y')}",
+            f"<b>📅 Добавлено:</b> {listing.created_at.strftime('%d.%m.%Y')}",
             "",
-            f"<b>📞 Telefon:</b> <code>+{listing.owner.phone_number if listing.owner else 'Ko\'rsatilmagan'}</code>",
+            f"<b>📞 Контакт:</b> <code>+{listing.owner.phone_number if listing.owner else 'Не указано'}</code>",
+            "",
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            "",
+            self._get_operator_info(listing),
         ]
 
         return "\n".join(lines)
 
     def build_continuation_caption(self, listing, batch_start, batch_end):
         """
-        10 tadan ortiq rasm bo'lganda, 2-va keyingi guruhlar uchun
-        qisqa, foydali izoh (rasmlar "quruq" turmasligi uchun)
+        Краткий заголовок для следующих групп фото (2+)
         """
-        phone = listing.owner.phone_number if listing.owner else "Ko'rsatilmagan"
+        phone = listing.owner.phone_number if listing.owner else "Не указано"
+        operator_info = self._get_operator_info(listing)
+
         lines = [
-            f"<b>🆔 ID {listing.id} — rasmlar davomi ({batch_start}-{batch_end})</b>",
+            f"<b>🆔 ID {listing.id} — фото ({batch_start}-{batch_end})</b>",
             "",
             f"<b>💰 ${listing.price:,.0f}</b>",
-            f"<b>📍 Rajon:</b> {listing.district.name}",
-            f"<b>📞 Telefon:</b> <code>+{phone}</code>",
+            f"<b>📍 Район:</b> {listing.district.name}",
+            f"<b>📞 Контакт:</b> <code>+{phone}</code>",
+            "",
+            operator_info,
         ]
         return "\n".join(lines)
 
     async def send_listing_with_images_and_info(self, update: Update, listing):
         """
-        Send listing IMAGES + TEXT as ONE MESSAGE (birinchi 10 tasi uchun)
-        Agar rasmlar 10 tadan ko'p bo'lsa, Telegram cheklovi (sendMediaGroup
-        bitta chaqiruvda maksimum 10 ta media qabul qiladi) sababli qolgan
-        rasmlar keyingi habar(lar)da, lekin qisqa izoh bilan birga jo'natiladi.
+        Отправить информацию и фото объявления
         """
         images = [img for img in listing.images.all() if img.image]
         text = self.build_listing_message(listing)
 
-        logger.info(f"Listing {listing.id}: found {len(images)} image(s)")
+        logger.info(f"Listing {listing.id}: найдено {len(images)} фото")
 
-        # Agar rasmlar yo'qsa, faqat text jo'nat
+        # Если нет фото, отправить только текст
         if not images:
             await update.message.reply_text(text, parse_mode='HTML')
             return
 
-        # Rasmlarni maksimum 10 ta batch-da jo'nat (Telegram limit)
-        # Har batch = bitta habar
+        # Отправить фото батчами по 10 (лимит Telegram)
         for batch_start in range(0, len(images), 10):
             batch = images[batch_start:batch_start + 10]
             media = []
@@ -180,15 +215,14 @@ class TelegramBot:
                 file_bytes = await self._read_image_bytes(img)
 
                 if batch_start == 0 and idx == 0:
-                    # Birinchi guruh, birinchi rasm -> to'liq karta
+                    # Первая фото первой группы -> полная карточка
                     media.append(InputMediaPhoto(
                         media=file_bytes,
                         caption=text,
                         parse_mode='HTML'
                     ))
                 elif idx == 0:
-                    # Ikkinchi va keyingi guruhlarning birinchi rasmi ->
-                    # qisqa, foydali izoh (bo'sh/quruq qolmasligi uchun)
+                    # Первая фото следующих групп -> краткий заголовок
                     continuation_caption = self.build_continuation_caption(
                         listing, batch_start + 1, batch_start + len(batch)
                     )
@@ -203,12 +237,12 @@ class TelegramBot:
             try:
                 await update.message.reply_media_group(media=media)
                 logger.info(
-                    f"Listing {listing.id}: media group muvaffaqiyatli jo'natildi "
+                    f"Listing {listing.id}: группа фото отправлена "
                     f"({batch_start + 1}-{batch_start + len(batch)})"
                 )
             except Exception as e:
                 logger.exception(f"Error sending media group: {e}")
-                # Fallback: text + rasmlar alohida
+                # Fallback: текст + фото отдельно
                 if batch_start == 0:
                     await update.message.reply_text(text, parse_mode='HTML')
                 else:
@@ -230,7 +264,7 @@ class TelegramBot:
             listing_id = int(update.message.text.strip())
         except ValueError:
             await update.message.reply_text(
-                "❌ <b>Xatolik!</b> Iltimos, faqat raqam kiriting (masalan: 34858)",
+                "❌ <b>Ошибка!</b> Пожалуйста, введите только номер (например: 34858)",
                 parse_mode='HTML'
             )
             return
@@ -239,14 +273,14 @@ class TelegramBot:
 
         if not listing:
             await update.message.reply_text(
-                f"❌ <b>Kvartira topilmadi!</b> ID: {listing_id}\n\n"
-                "Iltimos, to'g'ri ID ni kiriting.\n\n"
-                "Agar sizda savollar bo'lsa, iltimos, admin bilan bog'laning.",
+                f"❌ <b>Объявление не найдено!</b> ID: {listing_id}\n\n"
+                "Пожалуйста, проверьте ID.\n\n"
+                "Если у вас есть вопросы, свяжитесь с администратором.",
                 parse_mode='HTML'
             )
             return
 
-        # Rasmlar + Text = BIR HABAR
+        # Фото + Текст = одно сообщение
         await self.send_listing_with_images_and_info(update, listing)
 
     async def handle_callback_query(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -256,7 +290,7 @@ class TelegramBot:
 
         if query.data.startswith('copy_phone_'):
             phone_number = query.data.replace('copy_phone_', '')
-            await query.message.reply_text(f"📞 <b>Telefon raqam:</b> <code>{phone_number}</code>", parse_mode='HTML')
+            await query.message.reply_text(f"📞 <b>Номер телефона:</b> <code>{phone_number}</code>", parse_mode='HTML')
 
     def run(self):
         """Run the bot"""
@@ -270,6 +304,7 @@ class TelegramBot:
 
 # Bot instance
 bot_instance = None
+
 
 def start_bot():
     """Start the bot (call this from management command or celery)"""

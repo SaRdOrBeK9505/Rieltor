@@ -71,18 +71,22 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ['id', 'username', 'email', 'role', 'phone_number', 'is_active', 'date_joined']
         read_only_fields = ['id', 'date_joined']
 
-
 class UserCreateSerializer(serializers.ModelSerializer):
     """
     Serializer for creating new users.
     Password is write-only and must be at least 8 characters.
     Default role is 'operator'.
+    Username must be unique.
     """
     password = serializers.CharField(
         write_only=True,
         style={'input_type': 'password'},
         min_length=8,
         help_text="User password (minimum 8 characters)"
+    )
+    username = serializers.CharField(
+        max_length=150,
+        help_text="Username must be unique"
     )
     role = serializers.ChoiceField(
         choices=[('admin', 'Admin'), ('operator', 'Operator')],
@@ -94,6 +98,14 @@ class UserCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['username', 'password', 'email', 'role', 'phone_number']
+
+    def validate_username(self, value):
+        """Check if username already exists"""
+        if User.objects.filter(username=value).exists():
+            raise serializers.ValidationError(
+                "Bu username allaqachon mavjud."
+            )
+        return value
 
     def create(self, validated_data):
         password = validated_data.pop('password')
