@@ -6,7 +6,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from django.conf import settings
 from listings.models import Listing, ListingImage
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('telegram_bot')
 
 
 class TelegramBot:
