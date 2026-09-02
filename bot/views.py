@@ -82,7 +82,7 @@ class TelegramBot:
         return value if value else "Ko'rsatilmagan"
 
     def build_listing_message(self, listing):
-        """Build a detailed HTML card text for a listing (AFTER IMAGES)"""
+        """Build a detailed HTML card text for a listing"""
         get_display = self._get_display
 
         deal_status = "SOTUVDA" if listing.deal_type == 'sale' else "IJARAGA"
@@ -124,63 +124,55 @@ class TelegramBot:
             f"<b>📅 Ro'yxatdan o'tgan:</b> {listing.registered_at.strftime('%d.%m.%Y')}",
             "",
             f"<b>📞 Telefon:</b> <code>+{listing.owner.phone_number if listing.owner else 'Ko\'rsatilmagan'}</code>",
-            ]
+        ]
 
         return "\n".join(lines)
 
-    async def send_listing_images_grid(self, update: Update, images):
-        """Send images in grid format: 3-2-3-2... pattern (max 15)"""
+    async def send_listing_with_images_and_info(self, update: Update, listing):
+        """
+        Send listing IMAGES + TEXT as ONE MESSAGE
+        Images in batches (max 10 per batch), caption attached to first image
+        """
+        images = [img for img in listing.images.all() if img.image]
+        text = self.build_listing_message(listing)
+
+        logger.info(f"Listing {listing.id}: found {len(images)} image(s)")
+
+        # Agar rasmlar yo'qsa, faqat text jo'nat
         if not images:
+            await update.message.reply_text(text, parse_mode='HTML')
             return
 
-        # Limit to 15 images
-        images = images[:15]
+        # Rasmlarni maksimum 10 ta batch-da jo'nat (Telegram limit)
+        # Har batch = bitta habar
+        for batch_start in range(0, len(images), 10):
+            batch = images[batch_start:batch_start + 10]
+            media = []
 
-        # Split images: 3-2-3-2... pattern
-        batches = []
-        i = 0
-        while i < len(images):
-            if len(batches) % 2 == 0:
-                # Even batch = 3 images
-                batches.append(images[i:i + 3])
-                i += 3
-            else:
-                # Odd batch = 2 images
-                batches.append(images[i:i + 2])
-                i += 2
+            for idx, img in enumerate(batch):
+                # BIRINCHI RASM + CAPTION (text)
+                if batch_start == 0 and idx == 0:
+                    media.append(InputMediaPhoto(
+                        media=img.image.url,
+                        caption=text,
+                        parse_mode='HTML'
+                    ))
+                # QOLGAN RASMLAR - caption yo'q
+                else:
+                    media.append(InputMediaPhoto(media=img.image.url))
 
-        # Send each batch as media group
-        for batch in batches:
             try:
-                media = [InputMediaPhoto(media=img.image.url) for img in batch]
                 await update.message.reply_media_group(media=media)
             except Exception as e:
-                logger.error(f"Error sending image batch: {e}")
-                # Fallback: send individually
+                logger.error(f"Error sending media group: {e}")
+                # Fallback: text + rasmlar alohida
+                if batch_start == 0:
+                    await update.message.reply_text(text, parse_mode='HTML')
                 for img in batch:
                     try:
                         await update.message.reply_photo(photo=img.image.url)
                     except Exception as e2:
-                        logger.error(f"Error sending single image: {e2}")
-
-    async def send_listing_images(self, update: Update, listing):
-        """Send listing - IMAGES FIRST (grid), THEN text info"""
-        images = [img for img in listing.images.all() if img.image]
-
-        logger.info(f"Listing {listing.id}: found {len(images)} image(s)")
-        for img in images:
-            try:
-                logger.info(f"  -> image url: {img.image.url}")
-            except Exception as e:
-                logger.error(f"  -> could not resolve url for image {img.id}: {e}")
-
-        # STEP 1: Send images (grid format)
-        if images:
-            await self.send_listing_images_grid(update, images)
-
-        # STEP 2: Send text info (after images)
-        message = self.build_listing_message(listing)
-        await update.message.reply_text(message, parse_mode='HTML')
+                        logger.error(f"Error sending image: {e2}")
 
     async def handle_listing_id(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle listing ID input"""
@@ -204,7 +196,8 @@ class TelegramBot:
             )
             return
 
-        await self.send_listing_images(update, listing)
+        # Rasmlar + Text = BIR HABAR
+        await self.send_listing_with_images_and_info(update, listing)
 
     async def handle_callback_query(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle callback queries (button clicks)"""
@@ -227,7 +220,6 @@ class TelegramBot:
 
 # Bot instance
 bot_instance = None
-
 
 def start_bot():
     """Start the bot (call this from management command or celery)"""
