@@ -9,6 +9,17 @@ from listings.models import Listing, ListingImage
 logger = logging.getLogger('telegram_bot')
 
 
+import io
+
+@sync_to_async
+def _read_image_bytes(self, img):
+    """Spaces'dan (boto3 orqali, CDN'ni chetlab o'tib) faylni o'qish"""
+    with img.image.open('rb') as f:
+        data = f.read()
+    bio = io.BytesIO(data)
+    bio.name = img.image.name.split('/')[-1] or 'image.jpg'
+    return bio
+
 class TelegramBot:
     def __init__(self):
         self.token = getattr(settings, 'TELEGRAM_BOT_TOKEN', None)
@@ -150,16 +161,15 @@ class TelegramBot:
             media = []
 
             for idx, img in enumerate(batch):
-                # BIRINCHI RASM + CAPTION (text)
+                file_bytes = await self._read_image_bytes(img)
                 if batch_start == 0 and idx == 0:
                     media.append(InputMediaPhoto(
-                        media=img.image.url,
+                        media=file_bytes,
                         caption=text,
                         parse_mode='HTML'
                     ))
-                # QOLGAN RASMLAR - caption yo'q
                 else:
-                    media.append(InputMediaPhoto(media=img.image.url))
+                    media.append(InputMediaPhoto(media=file_bytes))
 
             try:
                 await update.message.reply_media_group(media=media)
@@ -170,9 +180,10 @@ class TelegramBot:
                     await update.message.reply_text(text, parse_mode='HTML')
                 for img in batch:
                     try:
-                        await update.message.reply_photo(photo=img.image.url)
+                        file_bytes = await self._read_image_bytes(img)
+                        await update.message.reply_photo(photo=file_bytes)
                     except Exception as e2:
-                        logger.error(f"Error sending image: {e2}")
+                        logger.exception(f"Error sending image: {e2}")
 
     async def handle_listing_id(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle listing ID input"""
