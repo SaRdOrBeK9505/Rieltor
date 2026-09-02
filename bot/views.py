@@ -11,15 +11,6 @@ logger = logging.getLogger('telegram_bot')
 
 import io
 
-@sync_to_async
-def _read_image_bytes(self, img):
-    """Spaces'dan (boto3 orqali, CDN'ni chetlab o'tib) faylni o'qish"""
-    with img.image.open('rb') as f:
-        data = f.read()
-    bio = io.BytesIO(data)
-    bio.name = img.image.name.split('/')[-1] or 'image.jpg'
-    return bio
-
 class TelegramBot:
     def __init__(self):
         self.token = getattr(settings, 'TELEGRAM_BOT_TOKEN', None)
@@ -87,6 +78,15 @@ class TelegramBot:
         except Exception as e:
             logger.error(f"Error fetching listing: {e}")
             return None
+
+    @sync_to_async
+    def _read_image_bytes(self, img):
+        """Spaces'dan (boto3 orqali, CDN'ni chetlab o'tib) faylni o'qish"""
+        with img.image.open('rb') as f:
+            data = f.read()
+        bio = io.BytesIO(data)
+        bio.name = img.image.name.split('/')[-1] or 'image.jpg'
+        return bio
 
     @staticmethod
     def _get_display(value):
