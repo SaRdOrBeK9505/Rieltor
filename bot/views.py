@@ -160,9 +160,9 @@ class TelegramBot:
             "",
             f"💰 Цена: {listing.price:,.0f}$",
         ]
-
-        if listing.price_per_sqm:
-            lines.append(f"💵 {listing.price_per_sqm:,.2f}$/м²")
+        #
+        # if listing.price_per_sqm:
+        #     lines.append(f"💵 {listing.price_per_sqm:,.2f}$/м²")
 
         phone = listing.owner.phone_number if listing.owner else "Не указано"
         lines += [
