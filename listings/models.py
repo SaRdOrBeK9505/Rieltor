@@ -28,14 +28,13 @@ class PropertyOwner(models.Model):
 
 class Listing(models.Model):
     PROPERTY_TYPE_CHOICES = (
-        ('novostroyka', 'Novostroyka'),
-        ('vtorichka', 'Vtorichka'),
+        ('novostroyka', 'Новостройка'),
+        ('vtorichka', 'Вторичка'),
     )
     DEAL_TYPE_CHOICES = (
-        ('sale', 'Prodaja'),
-        ('rent', 'Arenda'),
+        ('sale', 'Продажа'),
+        ('rent', 'Аренда'),
     )
-
     owner = models.ForeignKey(
         PropertyOwner,
         on_delete=models.CASCADE,
@@ -47,30 +46,23 @@ class Listing(models.Model):
         null=True,
         related_name='created_listings'
     )
-
     property_type = models.CharField(max_length=20, choices=PROPERTY_TYPE_CHOICES)
     deal_type = models.CharField(max_length=10, choices=DEAL_TYPE_CHOICES)
-
     rooms_count = models.PositiveSmallIntegerField()
     floor = models.PositiveSmallIntegerField()
     total_floors = models.PositiveSmallIntegerField()
     total_area = models.DecimalField(max_digits=8, decimal_places=2)
-
     district = models.ForeignKey(
         District,
         on_delete=models.PROTECT,
         related_name='listings'
     )
-
     address = models.TextField(blank=True, help_text="To'liq manzil")
     nearby = models.TextField(blank=True, help_text="Yaqinidagi obyektlar")
     amenities = models.TextField(blank=True, help_text="Qo'shimcha sharoitlar (lift, internet, etc.)")
-
     price = models.DecimalField(max_digits=14, decimal_places=2)
     price_per_sqm = models.DecimalField(max_digits=12, decimal_places=2, editable=False)
-
     registered_at = models.DateTimeField(default=timezone.now)
-
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -84,7 +76,6 @@ class Listing(models.Model):
 
     class Meta:
         ordering = ['-registered_at']
-
 
 def listing_image_path(instance, filename):
     return f"listings/{instance.listing_id}/{filename}"
