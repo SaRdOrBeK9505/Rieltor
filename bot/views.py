@@ -134,6 +134,8 @@ class TelegramBot:
         property_status = listing.get_property_type_display().upper()
 
         lines = [
+            f"🆔 ID {listing.id}",
+            "",
             f"🔥🔥{deal_status}🔥🔥",
             "",
             f"🏠 ТИП- {property_status}",
