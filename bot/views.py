@@ -7,6 +7,8 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from django.conf import settings
 from listings.models import Listing, ListingImage
 
+from PIL import Image
+
 logger = logging.getLogger('telegram_bot')
 
 
@@ -83,11 +85,51 @@ class TelegramBot:
 
     @sync_to_async
     def _read_image_bytes(self, img):
-        """Читать файл из Spaces (boto3)"""
+        """Читать файл из Spaces и конвертировать AVIF в JPEG"""
         with img.image.open('rb') as f:
             data = f.read()
+
         bio = io.BytesIO(data)
-        bio.name = img.image.name.split('/')[-1] or 'image.jpg'
+
+        # Определяем расширение файла
+        file_name = img.image.name.split('/')[-1] or 'image.jpg'
+        file_ext = file_name.lower().split('.')[-1]
+
+        # Если AVIF, конвертируем в JPEG
+        if file_ext == 'avif':
+            try:
+                # Открыть AVIF изображение
+                img_pil = Image.open(bio)
+
+                # Если альфа-канал, конвертируем в RGB
+                if img_pil.mode in ('RGBA', 'LA', 'P'):
+                    # Белый фон
+                    background = Image.new('RGB', img_pil.size, (255, 255, 255))
+                    if img_pil.mode == 'P':
+                        img_pil = img_pil.convert('RGBA')
+                    if img_pil.mode == 'RGBA':
+                        background.paste(img_pil, mask=img_pil.split()[3])
+                    else:  # LA
+                        background.paste(img_pil, mask=img_pil.split()[1])
+                    img_pil = background
+                elif img_pil.mode != 'RGB':
+                    img_pil = img_pil.convert('RGB')
+
+                # Сохранить как JPEG
+                jpeg_io = io.BytesIO()
+                img_pil.save(jpeg_io, format='JPEG', quality=85, optimize=True)
+                jpeg_io.seek(0)
+                jpeg_io.name = file_name.replace('.avif', '.jpg')
+
+                logger.info(f"Converted AVIF to JPEG: {file_name}")
+                return jpeg_io
+            except Exception as e:
+                logger.error(f"Error converting AVIF to JPEG: {e}")
+                # Fallback: вернуть оригинальный файл
+                bio.name = file_name
+                return bio
+
+        bio.name = file_name
         return bio
 
     @staticmethod
